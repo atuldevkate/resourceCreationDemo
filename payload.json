@@ -1,0 +1,8 @@
+{
+    "vpc_name": "test-myvpc",
+    "cidr_block": "10.0.0.0/16",
+    "region": "us-east-1",
+    "subnet_to_be_created": 2,
+    "subnet_name_1": "my_subnet1",
+    "subnet_name_2": "my_subnet2"
+}

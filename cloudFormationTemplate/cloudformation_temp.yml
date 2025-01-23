@@ -67,7 +67,7 @@ Resources:
       Role: !GetAtt MyLambdaFuncExecutionRoleDemo.Arn
       Code:
         S3Bucket: my-lambda-funcs-demo
-        S3Key: my-lambda-func2.zip
+        S3Key: final_project/my-lambda_func-demo.zip
 
       Runtime: python3.9
       Timeout: 60

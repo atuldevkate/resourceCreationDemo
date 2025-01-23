@@ -93,7 +93,7 @@ def create_resources(event):
 
     subnets = []
     for i in range(subnet_to_be_created):
-        subnet_response = ec2.create_subnet(CidrBlock=f'10.20.{i}.0/24', VpcId=vpc_id)
+        subnet_response = ec2.create_subnet(CidrBlock=f'10.0.{i}.0/24', VpcId=vpc_id)
         subnet_id = subnet_response['Subnet']['SubnetId']
         subnet_name = body.get(f'subnet_name_{i+1}')
         ec2.create_tags(Resources=[subnet_id], Tags=[{'Key': 'Name', 'Value': subnet_name}])
