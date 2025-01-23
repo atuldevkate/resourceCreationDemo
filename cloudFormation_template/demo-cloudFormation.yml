@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create DynamoDB table and Lambda function with required IAM roles and policies.
+
+Resources:
+  #DynamoDB Table creation
+  MyDynamoDBDemo:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: my-dynamodb-demo
+      AttributeDefinitions:
+        - AttributeName: vpc-name
+          AttributeType: S
+      KeySchema:
+        - AttributeName: vpc-name
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      Tags:
+        - Key: Name
+          Value: my-dynamodb-demo
+
+  #Lambda Execution Role
+  MyLambdaFuncExecutionRoleDemo:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: my-lambda-func-role-demo
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: my-lambda-policy-demo
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource: !GetAtt MyDynamoDBDemo.Arn
+              - Effect: Allow
+                Action:
+                  - ec2:CreateVpc
+                  - ec2:CreateSubnet
+                  - ec2:CreateTags
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeSubnets
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: 'arn:aws:logs:*:*:*'
+
+  # Lambda Function
+  MyLambdaFuncDemo:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: my-lambda_func-demo
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt MyLambdaFuncExecutionRoleDemo.Arn
+      Code:
+        S3Bucket: my-lambda-funcs-demo
+        S3Key: my-lambda-func2.zip
+
+      Runtime: python3.9
+      Timeout: 60
+      MemorySize: 128
+
+
+  # APIGateway Role for Lambda Invocation
+  MyApiGatewayRoleDemo:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: my-apigateway-role-demo
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: my-apigateway-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt MyLambdaFuncDemo.Arn
+
+Outputs:
+  DynamoDBTableName:
+    Description: DynamoDB table
+    Value: !Ref MyDynamoDBDemo
+
+  LambdaFunctionName:
+    Description: Lambda function
+    Value: !Ref MyLambdaFuncDemo
+
+  LambdaExecutionRoleArn:
+    Description: Lambda execution role
+    Value: !GetAtt MyLambdaFuncExecutionRoleDemo.Arn
+
+  ApiGatewayInvokeRoleArn:
+    Description: API Gateway role
+    Value: !GetAtt MyApiGatewayRoleDemo.Arn
