@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation template to create DynamoDB table and Lambda function with required IAM roles and policies.
+Description: CloudFormation template to create API Gateway, Lambda function & DynamoDB with required IAM roles and policies.
 
 Resources:
   #DynamoDB Table creation
@@ -22,7 +22,6 @@ Resources:
   MyLambdaFuncExecutionRoleDemo:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: my-lambda-func-role-demo
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -56,7 +55,7 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: 'arn:aws:logs:*:*:*'
+                Resource: '*'
 
   # Lambda Function
   MyLambdaFuncDemo:
@@ -73,28 +72,69 @@ Resources:
       Timeout: 60
       MemorySize: 128
 
-
-  # APIGateway Role for Lambda Invocation
-  MyApiGatewayRoleDemo:
-    Type: AWS::IAM::Role
+  # API Gateway Rest API
+  MyApiGateway:
+    Type: AWS::ApiGateway::RestApi
     Properties:
-      RoleName: my-apigateway-role-demo
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: apigateway.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: my-apigateway-policy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - lambda:InvokeFunction
-                Resource: !GetAtt MyLambdaFuncDemo.Arn
+      Name: MyApiGateway
+
+  # Root Resource
+  MyApiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt MyApiGateway.RootResourceId
+      PathPart: my_resources
+      RestApiId: !Ref MyApiGateway
+
+  # GET Method
+  GetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref MyApiGateway
+      ResourceId: !Ref MyApiGatewayResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - { LambdaArn: !GetAtt MyLambdaFuncDemo.Arn }
+
+  # POST Method
+  PostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref MyApiGateway
+      ResourceId: !Ref MyApiGatewayResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - { LambdaArn: !GetAtt MyLambdaFuncDemo.Arn }
+
+  # Deployment
+  MyApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref MyApiGateway
+      StageName: test
+    DependsOn:
+      - GetMethod
+      - PostMethod
+
+  # Permission for API Gateway
+  ApiGatewayPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt MyLambdaFuncDemo.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub
+        arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${MyApiGateway}/*
 
 Outputs:
   DynamoDBTableName:
@@ -109,6 +149,6 @@ Outputs:
     Description: Lambda execution role
     Value: !GetAtt MyLambdaFuncExecutionRoleDemo.Arn
 
-  ApiGatewayInvokeRoleArn:
-    Description: API Gateway role
-    Value: !GetAtt MyApiGatewayRoleDemo.Arn
+  ApiUrl:
+    Value: !Sub "https://${MyApiGateway}.execute-api.${AWS::Region}.amazonaws.com/test/my_resources"
+    Description: "The URL of the API Gateway"
